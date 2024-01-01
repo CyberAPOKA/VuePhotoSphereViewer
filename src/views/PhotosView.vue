@@ -3,8 +3,6 @@ import { onMounted, ref, reactive, watch } from 'vue';
 import { RouterLink, RouterView } from 'vue-router'
 import { Viewer } from '@photo-sphere-viewer/core';
 import { MarkersPlugin } from '@photo-sphere-viewer/markers-plugin';
-import Image from '@/assets/image.jpg';
-import SvgMarker from '@/assets/svgs/marker.svg'
 import axios from 'axios';
 
 const viewerRef = ref(null);
@@ -23,8 +21,9 @@ const getPhotos = async () => {
 
 const convertMarkers = (markers) => {
     return markers.map(marker => ({
-        id: marker.id.toString(),
-        image: SvgMarker,
+        // id: marker.id.toString(),
+        id: marker.code,
+        image: marker.icon_path,
         size: { width: 32, height: 32 },
         anchor: 'bottom center',
         tooltip: marker.tooltip,
