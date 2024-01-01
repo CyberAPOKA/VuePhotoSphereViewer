@@ -10,6 +10,7 @@ import axios from 'axios';
 import InputText from 'primevue/inputtext';
 import Textarea from 'primevue/textarea';
 import Button from 'primevue/button';
+import InputSwitch from 'primevue/inputswitch';
 
 const viewerRef = ref(null);
 const fileName = ref(null);
@@ -17,6 +18,12 @@ const isImageSelected = ref(false);
 const viewer = ref(null);
 const photoId = ref(null);
 const activeTab = ref('panorama');
+const markers = ref([]);
+const addingMarker = ref(false);
+// const markerCode = ref(null)
+const selectedMarkerCode = ref(null);
+const selectedMarkerId = ref(null);
+const editingMarker = ref(false);
 
 const uploadImageToServer = async (formData) => {
   try {
@@ -25,8 +32,6 @@ const uploadImageToServer = async (formData) => {
         'Content-Type': 'multipart/form-data',
       },
     });
-    // console.log(response.data.url)
-    // console.log(response.data.id)
     if (response.data && response.data.url && response.data.id) {
       fileName.value = response.data.url;
       markerData.photo_id = response.data.id;
@@ -60,6 +65,19 @@ const markerData = reactive({
 const photoData = reactive({
   caption: '',
   description: '',
+  fisheye: false,
+  mousewheel: true,
+  mousewheelCtrlKey: false,
+  mousemove: true,
+  touchmoveTwoFingers: false,
+  moveInertia: true,
+  navbarOptions: {
+    zoom: true,
+    move: true,
+    caption: true,
+    download: true,
+    fullscreen: true,
+  },
 });
 
 const initializeViewer = () => {
@@ -69,62 +87,133 @@ const initializeViewer = () => {
     panorama: `http://127.0.0.1:8000/api/storage/${fileName.value}`,
     caption: photoData.caption,
     description: photoData.description,
+    fisheye: photoData.fisheye,
+    mousewheel: photoData.mousewheel,
+    mousewheelCtrlKey: photoData.mousewheelCtrlKey,
+    mousemove: photoData.mousemove,
+    touchmoveTwoFingers: photoData.touchmoveTwoFingers,
+    moveInertia: photoData.moveInertia,
+    navbar: [
+      photoData.navbarOptions.zoom ? 'zoom' : null,
+      photoData.navbarOptions.move ? 'move' : null,
+      photoData.navbarOptions.caption ? 'caption' : null,
+      photoData.navbarOptions.download ? 'download' : null,
+      photoData.navbarOptions.fullscreen ? 'fullscreen' : null,
+    ].filter(Boolean),
 
     plugins: [
       [MarkersPlugin],
     ],
   });
 
-  console.log('viewer', viewer)
-
   const markersPlugin = viewer.value.getPlugin(MarkersPlugin);
 
   viewer.value.addEventListener('click', ({ data }) => {
-    console.log('data:', data)
-    if (!data.rightclick && markerData.tooltip != '' && markerData.content != '') {
+    if (editingMarker && selectedMarkerCode.value) {
+
+      editableMarkerData.code = selectedMarkerCode.value;
+      editableMarkerData.yaw = data.yaw;
+      editableMarkerData.pitch = data.pitch;
+
+      const newMarkerCode = '#' + Math.random();
+
+      console.log('newMarkerCode', newMarkerCode)
+      if (selectedMarkerCode.value != null) {
+        markersPlugin.removeMarker(selectedMarkerCode.value)
+        selectedMarkerCode.value = null
+      }
+
+      selectedMarkerCode.value = newMarkerCode
+      editableMarkerData.code = selectedMarkerCode.value;
+
       markersPlugin.addMarker({
-        id: '#' + Math.random(),
+        id: newMarkerCode,
         position: { yaw: data.yaw, pitch: data.pitch },
         image: SvgMarker,
         size: { width: 32, height: 32 },
         anchor: 'bottom center',
-        tooltip: markerData.tooltip,
-        content: '<div>' + markerData.content + '</div>',
+        tooltip: editableMarkerData.tooltip,
+        content: '<div>' + editableMarkerData.content + '</div>',
         data: {
           generated: true,
         },
       });
 
-      sendMarkerData(data);
+      console.log('call updateMarkerData', editableMarkerData)
+      updateMarkerData(editableMarkerData);
 
-      markerData.tooltip = '';
-      markerData.content = '';
+    } else {
+      if (!data.rightclick && markerData.tooltip != '' && markerData.content != '') {
 
+        const markerCode = '#' + Math.random();
+
+        markersPlugin.addMarker({
+          id: markerCode,
+          // id: '#' + Math.random(),
+          position: { yaw: data.yaw, pitch: data.pitch },
+          // position: { yaw: 0, pitch: 0 },
+          image: SvgMarker,
+          size: { width: 32, height: 32 },
+          anchor: 'bottom center',
+          tooltip: markerData.tooltip,
+          content: '<div>' + markerData.content + '</div>',
+          data: {
+            generated: true,
+          },
+        });
+
+        sendMarkerData(data, markerCode);
+        // markerData.id 
+        markerData.tooltip = '';
+        markerData.content = '';
+
+      }
     }
   });
+
 };
 
-watch(() => [photoData.caption, photoData.description], (newValues) => {
+watch(() => [photoData.caption, photoData.description, photoData.fisheye, photoData.mousewheel, photoData.mousewheelCtrlKey, photoData.mousemove, photoData.touchmoveTwoFingers, photoData.moveInertia, photoData.navbarOptions.zoom, photoData.navbarOptions.move, photoData.navbarOptions.caption, photoData.navbarOptions.download, photoData.navbarOptions.fullscreen, photoData.yaw, photoData.pitch, photoData.code], (newValues) => {
   if (viewer.value) {
     viewer.value.setOptions({
       caption: newValues[0],
       description: newValues[1],
+      fisheye: newValues[2],
+      mousewheel: newValues[3],
+      mousewheelCtrlKey: newValues[4],
+      mousemove: newValues[5],
+      touchmoveTwoFingers: newValues[6],
+      moveInertia: newValues[7],
+      navbar: [
+        newValues[8] ? 'zoom' : null,
+        newValues[9] ? 'move' : null,
+        newValues[10] ? 'caption' : null,
+        newValues[11] ? 'download' : null,
+        newValues[12] ? 'fullscreen' : null,
+      ].filter(Boolean),
+
     });
+    console.log('new value yaw', newValues[13])
+    console.log('new value pitch', newValues[14])
+    console.log('new value code', newValues[15])
   }
 });
 
-const sendMarkerData = async (data) => {
-  console.log('dataStore', data)
+const sendMarkerData = async (data, code) => {
   data.photo_id = markerData.photo_id
+  data.code = code
   data.tooltip = markerData.tooltip
   data.content = markerData.content
+  selectedMarkerCode.value = code
   try {
-    await axios.post(`http://127.0.0.1:8000/api/add-marker/${data.photo_id}`, data);
-    console.log('Dados enviados com sucesso');
-    console.log('data:', data)
+    const response = await axios.post(`http://127.0.0.1:8000/api/add-marker/${data.photo_id}`, data);
+
+    markers.value.push(response.data)
+    addingMarker.value = false
+    activeTab.value = 'markers'
+    selectedMarkerCode.value = null
   } catch (error) {
     console.error('Erro ao enviar dados', error);
-    console.log('data:', data)
   }
 };
 
@@ -135,18 +224,87 @@ const updatePhotoInfo = async (photoData) => {
         'Content-Type': 'multipart/form-data',
       },
     });
-    console.log('teste:', response)
   } catch (error) {
     console.error('Erro ao enviar a imagem:', error);
   }
 };
+
+const editableMarkerData = reactive({
+  code: '',
+  tooltip: '',
+  content: '',
+  yaw: '',
+  pitch: '',
+});
+
+const selectMarkerForEditing = (markerId, markerCode) => {
+  editingMarker.value = true;
+  const marker = markers.value.find(m => m.code === markerCode);
+  console.log('marker', marker)
+  if (marker) {
+    selectedMarkerId.value = markerId;
+    selectedMarkerCode.value = markerCode;
+    // editableMarkerData.code = marker.code;
+    editableMarkerData.tooltip = marker.tooltip;
+    editableMarkerData.content = marker.content;
+    editableMarkerData.yaw = marker.yaw;
+    editableMarkerData.pitch = marker.pitch;
+  }
+};
+
+const back = () =>{
+  editingMarker.value = false
+  selectedMarkerCode.value = null
+}
+
+const updateMarkerData = async (editableMarkerData) => {
+  try {
+    console.log('selectedMarkerCode.value', selectedMarkerCode.value)
+    const response = await axios.post(`http://127.0.0.1:8000/api/update-marker-data/${selectedMarkerId.value}`, editableMarkerData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    photoData.code = editableMarkerData.code;
+    // selectedMarkerCode = editableMarkerData.code;
+    photoData.yaw = editableMarkerData.yaw;
+    photoData.pitch = editableMarkerData.pitch;
+    console.log('updateMarkerData:', response)
+
+    const updatedMarker = response.data;
+
+    const markerIndex = markers.value.findIndex(m => m.id === selectedMarkerId.value);
+    if (markerIndex !== -1) {
+      markers.value[markerIndex].code = updatedMarker.code;
+      markers.value[markerIndex].yaw = updatedMarker.yaw;
+      markers.value[markerIndex].pitch = updatedMarker.pitch;
+    }
+
+    console.log('markers', markers.value)
+
+  } catch (error) {
+    console.error('Erro ao enviar a imagem:', error);
+  }
+};
+
 </script>
 
 <template>
   <div class="mx-2 md:mx-4 lg:mx-6 xl:mx-8 2xl:mx-10">
+    <div class="bg-black text-white flex p-2 gap-4">
+      <div class="border p-4">
+        addingMarker: {{ addingMarker }}
+      </div>
+      <div class="border p-4">
+        selectedMarkerCode: {{ selectedMarkerCode }}
+      </div>
+      <div class="border p-4">
+        editingMarker: {{ editingMarker }}
+      </div>
+    </div>
     <div class="flex flex-col gap-4 2xl:grid grid-cols-3 mt-12">
 
-      <div class="w-full border border-gray-50 shadow-xl h-fit">
+      <div class="w-full border border-gray-50 shadow-xl h-fit" v-if="addingMarker === false && editingMarker === false">
         <div class="flex justify-between bg-blue-500 shadow-lg hover:cursor-pointer">
           <div @click="activeTab = 'panorama'" class="p-4 w-full text-center text-gray-200 text-sm font-semibold"
             :class="{ 'bg-white bg-opacity-15 border-b-2 border-white text-white': activeTab === 'panorama' }">PANORAMA
@@ -158,6 +316,9 @@ const updatePhotoInfo = async (photoData) => {
           <div @click="activeTab = 'navbarConfig'" class="p-4 w-full text-center text-gray-200 text-sm font-semibold"
             :class="{ 'bg-white bg-opacity-15 border-b-2 border-white text-white': activeTab === 'navbarConfig' }">NAVBAR
             CONFIG
+          </div>
+          <div @click="activeTab = 'markers'" class="p-4 w-full text-center text-gray-200 text-sm font-semibold"
+            :class="{ 'bg-white bg-opacity-15 border-b-2 border-white text-white': activeTab === 'markers' }">MARKERS
           </div>
         </div>
         <div v-if="activeTab === 'panorama'" class="flex flex-col gap-8 p-4">
@@ -176,19 +337,122 @@ const updatePhotoInfo = async (photoData) => {
             <label>Description</label>
           </span>
 
-          <div class="py-8">
-            <input type="text" v-model="markerData.tooltip" placeholder="Título do Marcador" />
-            <textarea v-model="markerData.content" placeholder="Descrição"></textarea>
+        </div>
+        <div v-if="activeTab === 'standardOptions'" class="grid lg:grid-cols-2 gap-4 p-4">
+          <div class="flex justify-start items-center gap-2">
+            <label class="font-semibold">Fisheye</label>
+            <InputSwitch v-model="photoData.fisheye" />
+          </div>
+          <div class="flex justify-start items-center gap-2">
+            <label class="font-semibold">Mousewheel</label>
+            <InputSwitch v-model="photoData.mousewheel" />
+          </div>
+          <div class="flex justify-start items-center gap-2">
+            <label class="font-semibold">Hold Ctrl to zoom</label>
+            <InputSwitch v-model="photoData.mousewheelCtrlKey" />
+          </div>
+          <div class="flex justify-start items-center gap-2">
+            <label class="font-semibold">Mouse move</label>
+            <InputSwitch v-model="photoData.mousemove" />
+          </div>
+          <div class="flex justify-start items-center gap-2">
+            <label class="font-semibold">Two fingers move</label>
+            <InputSwitch v-model="photoData.touchmoveTwoFingers" />
+          </div>
+          <div class="flex justify-start items-center gap-2">
+            <label class="font-semibold">Move inertia</label>
+            <InputSwitch v-model="photoData.moveInertia" />
           </div>
         </div>
-        <div v-if="activeTab === 'standardOptions'">
-          
+        <div v-if="activeTab === 'navbarConfig'" class="grid lg:grid-cols-2 gap-4 p-4">
+          <div class="flex justify-start items-center gap-2">
+            <label class="font-semibold">Zoom</label>
+            <InputSwitch v-model="photoData.navbarOptions.zoom" />
+          </div>
+          <div class="flex justify-start items-center gap-2">
+            <label class="font-semibold">Move</label>
+            <InputSwitch v-model="photoData.navbarOptions.move" />
+          </div>
+          <div class="flex justify-start items-center gap-2">
+            <label class="font-semibold">Caption</label>
+            <InputSwitch v-model="photoData.navbarOptions.caption" />
+          </div>
+          <div class="flex justify-start items-center gap-2">
+            <label class="font-semibold">Download</label>
+            <InputSwitch v-model="photoData.navbarOptions.download" />
+          </div>
+          <div class="flex justify-start items-center gap-2">
+            <label class="font-semibold">Fullscreen</label>
+            <InputSwitch v-model="photoData.navbarOptions.fullscreen" />
+          </div>
         </div>
-        <div v-if="activeTab === 'navbarConfig'">
-         
+        <div v-if="activeTab === 'markers'" class="flex flex-col gap-4 p-4 pt-8">
+
+          <div>
+            <h1>markers</h1>
+            <div class="flex flex-col gap-2">
+              <div v-for="marker in markers" :key="marker.id" class="bg-gray-100 p-2">
+                <h1>{{ marker.id }}</h1>
+                <h1>{{ marker.code }}</h1>
+                <h1>{{ marker.yaw }}</h1>
+                <h1>{{ marker.pitch }}</h1>
+                <Button @click="selectMarkerForEditing(marker.id, marker.code)" label="Editar" />
+              </div>
+            </div>
+          </div>
+
         </div>
 
+        <div class="flex justify-between items-center w-full">
+          <Button label="Reset" class="w-full" />
+          <Button label="Add Marker" class="w-full" @click="addingMarker = true" />
+        </div>
       </div>
+
+      <div class="w-full border border-gray-50 shadow-xl h-fit" v-if="addingMarker === true">
+        <div class="flex flex-col gap-4 p-4 pt-8">
+
+          <span class="p-float-label">
+            <InputText id="marker_title" class="w-full" v-model="markerData.tooltip" @blur="updatePhotoInfo(photoData)" />
+            <label for="marker_title">Título do Marcador</label>
+          </span>
+
+          <span class="p-float-label">
+            <Textarea v-model="markerData.content" class="w-full" rows="8" @blur="updatePhotoInfo(photoData)" />
+            <label>Descrição</label>
+          </span>
+
+          <div>
+            <Button label="Back" class="w-full" @click="addingMarker = false" />
+          </div>
+        </div>
+      </div>
+
+      <div class="w-full border border-gray-50 shadow-xl h-fit" v-if="editingMarker">
+        <div class="flex flex-col gap-8 p-4 pt-8">
+          <h3>Edit Marker</h3>
+          <h2>Code: {{ editableMarkerData.code }}</h2>
+          <span class="p-float-label">
+            <InputText id="tooltip" class="w-full" v-model="editableMarkerData.tooltip"
+              @blur="updatePhotoInfo(photoData)" />
+            <label for="tooltip">Tooltip</label>
+          </span>
+          <span class="p-float-label">
+            <Textarea v-model="editableMarkerData.content" class="w-full" rows="8" @blur="updatePhotoInfo(photoData)" />
+            <label>Content</label>
+          </span>
+          <span class="p-float-label">
+            <InputText id="yaw" class="w-full" v-model="editableMarkerData.yaw" />
+            <label for="yaw">Yaw</label>
+          </span>
+          <span class="p-float-label">
+            <InputText id="pitch" class="w-full" v-model="editableMarkerData.pitch" />
+            <label for="pitch">Pitch</label>
+          </span>
+          <Button @click="back()" label="Voltar" />
+        </div>
+      </div>
+
 
       <div ref="viewerRef" class="w-full h-[40rem] 2xl:col-span-2">
         <div class="w-full h-[40rem] 2xl:col-span-2 flex items-center justify-center bg-gray-50 shadow-xl"
@@ -199,4 +463,5 @@ const updatePhotoInfo = async (photoData) => {
 
     </div>
 
-</div></template>
+  </div>
+</template>
