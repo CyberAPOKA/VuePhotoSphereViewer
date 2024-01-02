@@ -10,6 +10,7 @@ import InputText from 'primevue/inputtext';
 import Textarea from 'primevue/textarea';
 import Button from 'primevue/button';
 import InputSwitch from 'primevue/inputswitch';
+import PencilSquare from '@/assets/svgs/PencilSquare.vue'
 import Pin1 from '@/assets/svgs/Pin1.vue'
 import Pin2 from '@/assets/svgs/Pin2.vue'
 import Pin3 from '@/assets/svgs/Pin3.vue'
@@ -29,9 +30,10 @@ const selectedMarkerCode = ref(null);
 const selectedMarkerId = ref(null);
 const editingMarker = ref(false);
 const markerType = ref(null)
-const markerPin = ref(SvgPin1)
+// const markerPin = ref(SvgPin1)
+const markerPin = ref(null)
 
-const uploadImageToServer = async (formData) => {
+async function uploadImageToServer(formData) {
   try {
     const response = await axios.post('http://127.0.0.1:8000/api/upload-image', formData, {
       headers: {
@@ -41,7 +43,7 @@ const uploadImageToServer = async (formData) => {
     if (response.data && response.data.url && response.data.id) {
       fileName.value = response.data.url;
       markerData.photo_id = response.data.id;
-      photoId.value = response.data.id
+      photoId.value = response.data.id;
       isImageSelected.value = true;
       initializeViewer();
     }
@@ -49,7 +51,7 @@ const uploadImageToServer = async (formData) => {
   } catch (error) {
     console.error('Erro ao enviar a imagem:', error);
   }
-};
+}
 
 const addImage = (event) => {
   const file = event.target.files[0];
@@ -62,6 +64,7 @@ const addImage = (event) => {
 
 const markerData = reactive({
   photo_id: null,
+  html: '',
   tooltip: '',
   content: '',
   yaw: '',
@@ -89,7 +92,6 @@ const photoData = reactive({
 
 const initializeViewer = () => {
   viewer.value = new Viewer({
-    // const viewer = new Viewer({
     container: viewerRef.value,
     panorama: `http://127.0.0.1:8000/api/storage/${fileName.value}`,
     caption: photoData.caption,
@@ -109,7 +111,7 @@ const initializeViewer = () => {
     ].filter(Boolean),
 
     plugins: [
-      [MarkersPlugin],
+      [MarkersPlugin, {}],
     ],
   });
 
@@ -121,7 +123,6 @@ const initializeViewer = () => {
       editableMarkerData.code = selectedMarkerCode.value;
       editableMarkerData.yaw = data.yaw;
       editableMarkerData.pitch = data.pitch;
-      // editableMarkerData.icon_path = data.icon_path;
 
       const newMarkerCode = '#' + Math.random();
 
@@ -134,46 +135,82 @@ const initializeViewer = () => {
       selectedMarkerCode.value = newMarkerCode
       editableMarkerData.code = selectedMarkerCode.value;
 
-      console.log(markerPin)
-      console.log('icon_path', editableMarkerData.icon_path)
-      markersPlugin.addMarker({
-        id: newMarkerCode,
-        position: { yaw: data.yaw, pitch: data.pitch },
-        image: editableMarkerData.icon_path,
-        size: { width: 32, height: 32 },
-        anchor: 'bottom center',
-        tooltip: editableMarkerData.tooltip,
-        content: '<div>' + editableMarkerData.content + '</div>',
-        data: {
-          generated: true,
-        },
-      });
+      console.log(markerType.value)
+
+      if (markerType.value === 'image') {
+        markersPlugin.addMarker({
+          id: newMarkerCode,
+          position: { yaw: data.yaw, pitch: data.pitch },
+          image: editableMarkerData.icon_path,
+          size: { width: 32, height: 32 },
+          anchor: 'bottom center',
+          tooltip: editableMarkerData.tooltip,
+          content: '<div>' + editableMarkerData.content + '</div>',
+          data: {
+            generated: true,
+          },
+        });
+      } else if (markerType.value === 'text') {
+        markersPlugin.addMarker({
+          id: newMarkerCode,
+          position: { yaw: data.yaw, pitch: data.pitch },
+          size: { width: 32, height: 32 },
+          anchor: 'bottom center',
+          html: editableMarkerData.html,
+          tooltip: editableMarkerData.tooltip,
+          content: '<div>' + editableMarkerData.content + '</div>',
+          data: {
+            generated: true,
+          },
+        });
+      }
 
       console.log('call updateMarkerData', editableMarkerData)
       updateMarkerData(editableMarkerData);
 
     } else {
       if (!data.rightclick && markerData.tooltip != '' && markerData.content != '') {
-
+        // Condições provisórias no momento
+        // Corrigir e melhorar o código para que seja mais fácil de implementar novos tipos de marcadores como polygon, polyline e image layers
+        console.log('z1', markerType.value, 'z2', markerData.html)
+        if (markerType.value === 'text' && (markerData.html === '' || markerData.html === null)) {
+          console.log('html vazio');
+          return;
+        }
         const markerCode = '#' + Math.random();
 
-        markersPlugin.addMarker({
-          id: markerCode,
-          // id: '#' + Math.random(),
-          position: { yaw: data.yaw, pitch: data.pitch },
-          // position: { yaw: 0, pitch: 0 },
-          image: markerPin.value,
-          size: { width: 32, height: 32 },
-          anchor: 'bottom center',
-          tooltip: markerData.tooltip,
-          content: markerData.content,
-          data: {
-            generated: true,
-          },
-        });
+        console.log(markerType.value)
+
+        if (markerType.value === 'image') {
+          markersPlugin.addMarker({
+            id: markerCode,
+            position: { yaw: data.yaw, pitch: data.pitch },
+            image: markerPin.value,
+            size: { width: 32, height: 32 },
+            anchor: 'bottom center',
+            tooltip: markerData.tooltip,
+            content: markerData.content,
+            data: {
+              generated: true,
+            },
+          });
+        } else if (markerType.value === 'text') {
+          markersPlugin.addMarker({
+            id: markerCode,
+            position: { yaw: data.yaw, pitch: data.pitch },
+            size: { width: 32, height: 32 },
+            anchor: 'bottom center',
+            html: markerData.html,
+            tooltip: markerData.tooltip,
+            content: markerData.content,
+            data: {
+              generated: true,
+            },
+          });
+        }
 
         sendMarkerData(data, markerCode);
-        // markerData.id 
+        markerData.html = '';
         markerData.tooltip = '';
         markerData.content = '';
 
@@ -212,6 +249,7 @@ watch(() => [photoData.caption, photoData.description, photoData.fisheye, photoD
 const sendMarkerData = async (data, code) => {
   data.photo_id = markerData.photo_id
   data.code = code
+  data.html = markerData.html
   data.tooltip = markerData.tooltip
   data.content = markerData.content
   data.icon_path = markerPin.value
@@ -242,6 +280,7 @@ const updatePhotoInfo = async (photoData) => {
 
 const editableMarkerData = reactive({
   code: '',
+  html: '',
   tooltip: '',
   content: '',
   yaw: '',
@@ -257,6 +296,7 @@ const selectMarkerForEditing = (markerId, markerCode, markerIconPath) => {
     selectedMarkerCode.value = markerCode;
     // editableMarkerData.code = marker.code;
     editableMarkerData.icon_path = marker.icon_path;
+    editableMarkerData.html = marker.html;
     editableMarkerData.tooltip = marker.tooltip;
     editableMarkerData.content = marker.content;
     editableMarkerData.yaw = marker.yaw;
@@ -342,16 +382,18 @@ const updateMarkerData = async (editableMarkerData) => {
         <div v-if="activeTab === 'panorama'" class="flex flex-col gap-8 p-4 min-h-[40rem]">
           <label for="dropzone-photo" class="hover:cursor-pointer">
             <div class="border shadow-md p-4 flex gap-4">
-              <PaperClip /> <span>Panorama image</span>
+              <PaperClip /><span>Panorama image</span>
             </div>
             <input id="dropzone-photo" type="file" @change="addImage" accept=".png, .jpeg, .jpg" class="hidden" />
           </label>
           <span class="p-float-label">
-            <InputText id="caption" class="w-full" v-model="photoData.caption" @blur="updatePhotoInfo(photoData)" />
+            <InputText id="caption" class="w-full" v-model="photoData.caption" @blur="updatePhotoInfo(photoData)"
+              :disabled="!fileName" :class="{ 'bg-gray-100': !fileName }" />
             <label for="caption">Caption</label>
           </span>
           <span class="p-float-label">
-            <Textarea v-model="photoData.description" class="w-full" rows="8" @blur="updatePhotoInfo(photoData)" />
+            <Textarea v-model="photoData.description" class="w-full" rows="8" @blur="updatePhotoInfo(photoData)"
+              :disabled="!fileName" :class="{ 'bg-gray-100': !fileName }" />
             <label>Description</label>
           </span>
 
@@ -360,27 +402,27 @@ const updateMarkerData = async (editableMarkerData) => {
           <div class="grid grid-cols-2 gap-4 pt-8 px-4">
             <div class="flex justify-start items-center gap-2">
               <label class="font-semibold">Fisheye</label>
-              <InputSwitch v-model="photoData.fisheye" />
+              <InputSwitch v-model="photoData.fisheye" :disabled="!fileName" />
             </div>
             <div class="flex justify-start items-center gap-2">
               <label class="font-semibold">Mousewheel</label>
-              <InputSwitch v-model="photoData.mousewheel" />
+              <InputSwitch v-model="photoData.mousewheel" :disabled="!fileName" />
             </div>
             <div class="flex justify-start items-center gap-2">
               <label class="font-semibold">Hold Ctrl to zoom</label>
-              <InputSwitch v-model="photoData.mousewheelCtrlKey" />
+              <InputSwitch v-model="photoData.mousewheelCtrlKey" :disabled="!fileName" />
             </div>
             <div class="flex justify-start items-center gap-2">
               <label class="font-semibold">Mouse move</label>
-              <InputSwitch v-model="photoData.mousemove" />
+              <InputSwitch v-model="photoData.mousemove" :disabled="!fileName" />
             </div>
             <div class="flex justify-start items-center gap-2">
               <label class="font-semibold">Two fingers move</label>
-              <InputSwitch v-model="photoData.touchmoveTwoFingers" />
+              <InputSwitch v-model="photoData.touchmoveTwoFingers" :disabled="!fileName" />
             </div>
             <div class="flex justify-start items-center gap-2">
               <label class="font-semibold">Move inertia</label>
-              <InputSwitch v-model="photoData.moveInertia" />
+              <InputSwitch v-model="photoData.moveInertia" :disabled="!fileName" />
             </div>
           </div>
         </div>
@@ -388,54 +430,59 @@ const updateMarkerData = async (editableMarkerData) => {
           <div class="grid grid-cols-2 gap-4 pt-8 px-4">
             <div class="flex justify-start items-center gap-2">
               <label class="font-semibold">Zoom</label>
-              <InputSwitch v-model="photoData.navbarOptions.zoom" />
+              <InputSwitch v-model="photoData.navbarOptions.zoom" :disabled="!fileName" />
             </div>
             <div class="flex justify-start items-center gap-2">
               <label class="font-semibold">Move</label>
-              <InputSwitch v-model="photoData.navbarOptions.move" />
+              <InputSwitch v-model="photoData.navbarOptions.move" :disabled="!fileName" />
             </div>
             <div class="flex justify-start items-center gap-2">
               <label class="font-semibold">Caption</label>
-              <InputSwitch v-model="photoData.navbarOptions.caption" />
+              <InputSwitch v-model="photoData.navbarOptions.caption" :disabled="!fileName" />
             </div>
             <div class="flex justify-start items-center gap-2">
               <label class="font-semibold">Download</label>
-              <InputSwitch v-model="photoData.navbarOptions.download" />
+              <InputSwitch v-model="photoData.navbarOptions.download" :disabled="!fileName" />
             </div>
             <div class="flex justify-start items-center gap-2">
               <label class="font-semibold">Fullscreen</label>
-              <InputSwitch v-model="photoData.navbarOptions.fullscreen" />
+              <InputSwitch v-model="photoData.navbarOptions.fullscreen" :disabled="!fileName" />
             </div>
           </div>
         </div>
-        <div v-if="activeTab === 'markers'" class="flex flex-col gap-4 p-4 pt-8 min-h-[40rem] overflow-y-auto">
+        <div v-if="activeTab === 'markers'" class="flex flex-col gap-4 p-4 h-[40rem] overflow-y-auto ">
 
           <div>
-            <h1>markers</h1>
-            <div class="flex flex-col gap-2">
-              <div v-for="marker in markers" :key="marker.id" class="bg-gray-100 p-2">
-                <h1>{{ marker.id }}</h1>
-                <!-- <h1>{{ marker.code }}</h1>
-                <h1>{{ marker.yaw }}</h1>
-                <h1>{{ marker.pitch }}</h1> -->
-                <h1>{{ marker.icon_path }}</h1>
-                <Button @click="selectMarkerForEditing(marker.id, marker.code, marker.icon_path)" label="Editar" />
+            <h1 class="text-center text-2xl font-bold">Marcadores</h1>
+            <div class="flex flex-col gap-4 mt-2 px-4" v-if="markers.length > 0">
+              <div v-for="marker in markers" :key="marker.id"
+                class="bg-gray-100 p-2 flex justify-between items-center px-4 rounded-lg hover:shadow-lg hover:scale-105 hover:ease-in duration-200 hover:border-2 hover:border-blue-500 hover:transition hover:transform hover:cursor-pointer"
+                @click="selectMarkerForEditing(marker.id, marker.code, marker.icon_path)">
+                <div class="flex flex-col">
+                  <h1 class="font-semibold text-sm">{{ marker.tooltip }}</h1>
+                  <h2 class="text-sm">Tipo: <span v-if="marker.icon_path">Imagem</span> <span v-else>Texto</span></h2>
+                </div>
+                <PencilSquare :class="'h-8 w-8 hover:scale-110 hover:ease-out hover:cursor-pointer'" />
               </div>
+            </div>
+            <div v-else class="text-center mt-8 text-xl font-semibold">
+              Ainda não há marcadores 😢
             </div>
           </div>
 
         </div>
 
-        <div class="flex justify-between items-center w-full border-t absolute bottom-0">
-          <Button label="RESETAR TUDO" class="bg-red-500 border-none w-fit m-4" />
-          <Button label="ADICIONAR MARCADORES" class="w-fit m-4" @click="addingMarker = true" />
+        <div class="flex justify-between items-center w-full border-t">
+          <Button label="RESETAR TUDO" class="bg-red-500 border-none w-fit m-4" :disabled="!fileName" />
+          <Button label="ADICIONAR MARCADORES" class="w-fit m-4"
+            @click="() => { addingMarker = true; markerType = null; markerPin = null }" :disabled="!fileName" />
         </div>
       </div>
 
       <div class="w-full border border-gray-50 shadow-xl h-fit" v-if="addingMarker === true">
         <div class="flex flex-col gap-4 p-4 pt-8" v-if="markerType === null">
 
-          <Button label="Imagem" class="w-full p-4" @click="markerType = 'image'" />
+          <Button label="Imagem" class="w-full p-4" @click="() => { markerType = 'image'; markerPin = SvgPin1; }" />
           <Button label="Texto" class="w-full p-4" @click="markerType = 'text'" />
 
         </div>
@@ -469,26 +516,39 @@ const updateMarkerData = async (editableMarkerData) => {
           </div>
         </div>
         <div v-if="markerType === 'text'">
-          <span class="p-float-label">
-            <InputText id="marker_title" class="w-full" v-model="markerData.tooltip" @blur="updatePhotoInfo(photoData)" />
-            <label for="marker_title">Título do Marcador</label>
-          </span>
+          <div class="flex flex-col gap-4 p-4">
+            <span class="p-float-label">
+              <InputText id="marker_html" class="w-full" v-model="markerData.html" @blur="updatePhotoInfo(photoData)" />
+              <label for="marker_html">Texto</label>
+            </span>
 
-          <span class="p-float-label">
-            <Textarea v-model="markerData.content" class="w-full" rows="8" @blur="updatePhotoInfo(photoData)" />
-            <label>Descrição</label>
-          </span>
+            <span class="p-float-label">
+              <InputText id="marker_title" class="w-full" v-model="markerData.tooltip"
+                @blur="updatePhotoInfo(photoData)" />
+              <label for="marker_title">Título do Marcador</label>
+            </span>
+
+            <span class="p-float-label">
+              <Textarea v-model="markerData.content" class="w-full" rows="8" @blur="updatePhotoInfo(photoData)" />
+              <label>Descrição</label>
+            </span>
+          </div>
         </div>
         <div>
-          <Button label="Voltar" class="w-full p-4" @click="markerType = null" v-if="markerType != null" />
+
+          <Button label="Voltar" class="w-full p-4" @click="() => { markerType = null; markerPin = null }"
+            v-if="markerType != null" />
           <Button label="Voltar" class="w-full p-4" @click="addingMarker = false" v-else />
         </div>
       </div>
 
       <div class="w-full border border-gray-50 shadow-xl h-fit" v-if="editingMarker">
         <div class="flex flex-col gap-8 p-4 pt-8">
-          <h3>Edit Marker</h3>
-          <h2>Code: {{ editableMarkerData.code }}</h2>
+          <h3 class="font-semibold text-lg text-center">EDITAR MARCADOR</h3>
+          <span class="p-float-label" v-if="editableMarkerData.html">
+            <InputText id="html" class="w-full" v-model="editableMarkerData.html" @blur="updatePhotoInfo(photoData)" />
+            <label for="html">Texto</label>
+          </span>
           <span class="p-float-label">
             <InputText id="tooltip" class="w-full" v-model="editableMarkerData.tooltip"
               @blur="updatePhotoInfo(photoData)" />
@@ -499,11 +559,12 @@ const updateMarkerData = async (editableMarkerData) => {
             <label>Content</label>
           </span>
           <span class="p-float-label">
-            <InputText id="yaw" class="w-full" v-model="editableMarkerData.yaw" />
+            <InputText id="yaw" class="w-full text-black opacity-100" v-model="editableMarkerData.yaw" :disabled="true" />
             <label for="yaw">Yaw</label>
           </span>
           <span class="p-float-label">
-            <InputText id="pitch" class="w-full" v-model="editableMarkerData.pitch" />
+            <InputText id="pitch" class="w-full text-black opacity-100" v-model="editableMarkerData.pitch"
+              :disabled="true" />
             <label for="pitch">Pitch</label>
           </span>
           <Button @click="back()" label="Voltar" />
@@ -514,7 +575,7 @@ const updateMarkerData = async (editableMarkerData) => {
       <div ref="viewerRef" class="w-full h-96 xl:h-full 2xl:col-span-2">
         <div class="w-full h-96 xl:h-full 2xl:col-span-2 flex items-center justify-center bg-gray-50 shadow-xl"
           v-if="!isImageSelected">
-          <h1 class="text-3xl font-semibold text-gray-700 text-center">Please select a panorama file</h1>
+          <h1 class="text-3xl font-semibold text-gray-700 text-center">Selecione uma imagem panorâmica (360º)</h1>
         </div>
       </div>
 
