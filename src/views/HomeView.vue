@@ -30,7 +30,6 @@ const selectedMarkerCode = ref(null);
 const selectedMarkerId = ref(null);
 const editingMarker = ref(false);
 const markerType = ref(null)
-// const markerPin = ref(SvgPin1)
 const markerPin = ref(null)
 
 async function uploadImageToServer(formData) {
@@ -210,6 +209,8 @@ const initializeViewer = () => {
         }
 
         sendMarkerData(data, markerCode);
+        // markerType.value = null;
+        // markerPin.value = null;
         markerData.html = '';
         markerData.tooltip = '';
         markerData.content = '';
@@ -274,7 +275,39 @@ const updatePhotoInfo = async (photoData) => {
       },
     });
   } catch (error) {
-    console.error('Erro ao enviar a imagem:', error);
+    console.error('Erro ao atualizar informações.', error);
+  }
+};
+
+const updateMarkerInfo = async (editableMarkerData) => {
+  console.log('editableMarkerData', editableMarkerData);
+  try {
+    const response = await axios.post(`http://127.0.0.1:8000/api/update-marker-info/${photoId.value}`, editableMarkerData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    console.log('updateMarkerInfo response:', response);
+
+    if (response.data) {
+      updateViewerMarker(response.data);
+    }
+
+  } catch (error) {
+    console.error('Erro ao atualizar informações.', error);
+  }
+};
+
+const updateViewerMarker = (updatedMarkerData) => {
+  const markersPlugin = viewer.value.getPlugin(MarkersPlugin);
+  const existingMarker = markersPlugin.getMarker(updatedMarkerData.code);
+
+  if (existingMarker) {
+    markersPlugin.updateMarker({
+      id: existingMarker.id,
+      tooltip: updatedMarkerData.tooltip,
+      content: updatedMarkerData.content,
+    });
   }
 };
 
@@ -290,10 +323,18 @@ const editableMarkerData = reactive({
 const selectMarkerForEditing = (markerId, markerCode, markerIconPath) => {
   editingMarker.value = true;
   const marker = markers.value.find(m => m.code === markerCode);
+  if (markerIconPath != null) {
+    markerType.value = 'image'
+  } else {
+    markerType.value = 'text'
+  }
+
   console.log('marker', marker)
   if (marker) {
     selectedMarkerId.value = markerId;
     selectedMarkerCode.value = markerCode;
+    // markerType.value = marker.type;
+    markerPin.value = marker.icon_path
     // editableMarkerData.code = marker.code;
     editableMarkerData.icon_path = marker.icon_path;
     editableMarkerData.html = marker.html;
@@ -336,15 +377,26 @@ const updateMarkerData = async (editableMarkerData) => {
     console.log('markers', markers.value)
 
   } catch (error) {
-    console.error('Erro ao enviar a imagem:', error);
+    console.error('Erro ao atualizar informações.', error);
   }
 };
+
+const resetFields = () => {
+  photoData.html = ''
+  markerData.html = ''
+  markerData.tooltip = ''
+  markerData.content = ''
+}
 
 </script>
 
 <template>
   <div class="mx-2 md:mx-4 lg:mx-6 xl:mx-8 2xl:mx-10 xl:h-[80vh]">
-    <!-- <div class="bg-black text-white flex flex-wrap p-2 gap-4">
+    <div class="bg-black text-white flex flex-wrap p-2 gap-4">
+      
+      <div class="border p-4">
+        activeTab: {{ activeTab }}
+      </div>
       <div class="border p-4">
         addingMarker: {{ addingMarker }}
       </div>
@@ -354,7 +406,13 @@ const updateMarkerData = async (editableMarkerData) => {
       <div class="border p-4">
         editingMarker: {{ editingMarker }}
       </div>
-    </div> -->
+      <div class="border p-4">
+        markerType: {{ markerType }}
+      </div>
+      <div class="border p-4">
+        markerPin: {{ markerPin }}
+      </div>
+    </div>
     <div class="flex flex-col gap-4 2xl:grid grid-cols-3 mt-12 xl:h-full">
 
       <div class="w-full border border-gray-50 shadow-xl h-full relative"
@@ -457,7 +515,7 @@ const updateMarkerData = async (editableMarkerData) => {
             <div class="flex flex-col gap-4 mt-2 px-4" v-if="markers.length > 0">
               <div v-for="marker in markers" :key="marker.id"
                 class="bg-gray-100 p-2 flex justify-between items-center px-4 rounded-lg hover:shadow-lg hover:scale-105 hover:ease-in duration-200 hover:border-2 hover:border-blue-500 hover:transition hover:transform hover:cursor-pointer"
-                @click="selectMarkerForEditing(marker.id, marker.code, marker.icon_path)">
+                @click="selectMarkerForEditing(marker.id, marker.code, marker.icon_path, marker.type)">
                 <div class="flex flex-col">
                   <h1 class="font-semibold text-sm">{{ marker.tooltip }}</h1>
                   <h2 class="text-sm">Tipo: <span v-if="marker.icon_path">Imagem</span> <span v-else>Texto</span></h2>
@@ -504,13 +562,12 @@ const updateMarkerData = async (editableMarkerData) => {
               </div>
             </div>
             <span class="p-float-label mt-2">
-              <InputText id="marker_title" class="w-full" v-model="markerData.tooltip"
-                @blur="updatePhotoInfo(photoData)" />
+              <InputText id="marker_title" class="w-full" v-model="markerData.tooltip" />
               <label for="marker_title">Título do Marcador</label>
             </span>
 
             <span class="p-float-label mt-2">
-              <Textarea v-model="markerData.content" class="w-full" rows="8" @blur="updatePhotoInfo(photoData)" />
+              <Textarea v-model="markerData.content" class="w-full" rows="8" />
               <label>Descrição</label>
             </span>
           </div>
@@ -518,27 +575,27 @@ const updateMarkerData = async (editableMarkerData) => {
         <div v-if="markerType === 'text'">
           <div class="flex flex-col gap-4 p-4">
             <span class="p-float-label">
-              <InputText id="marker_html" class="w-full" v-model="markerData.html" @blur="updatePhotoInfo(photoData)" />
+              <InputText id="marker_html" class="w-full" v-model="markerData.html" />
               <label for="marker_html">Texto</label>
             </span>
 
             <span class="p-float-label">
-              <InputText id="marker_title" class="w-full" v-model="markerData.tooltip"
-                @blur="updatePhotoInfo(photoData)" />
+              <InputText id="marker_title" class="w-full" v-model="markerData.tooltip" />
               <label for="marker_title">Título do Marcador</label>
             </span>
 
             <span class="p-float-label">
-              <Textarea v-model="markerData.content" class="w-full" rows="8" @blur="updatePhotoInfo(photoData)" />
+              <Textarea v-model="markerData.content" class="w-full" rows="8" />
               <label>Descrição</label>
             </span>
           </div>
         </div>
         <div>
 
-          <Button label="Voltar" class="w-full p-4" @click="() => { markerType = null; markerPin = null }"
-            v-if="markerType != null" />
-          <Button label="Voltar" class="w-full p-4" @click="addingMarker = false" v-else />
+          <Button label="Voltar" class="w-fit m-4 bg-transparent border-none text-red-500 hover:bg-red-200"
+            @click="() => { markerType = null; markerPin = null; resetFields() }" v-if="markerType != null" />
+          <Button label="Voltar" class="w-fit m-4 bg-transparent border-none text-red-500 hover:bg-red-200"
+            @click="() => { addingMarker = false; resetFields() }" v-else />
         </div>
       </div>
 
@@ -546,16 +603,18 @@ const updateMarkerData = async (editableMarkerData) => {
         <div class="flex flex-col gap-8 p-4 pt-8">
           <h3 class="font-semibold text-lg text-center">EDITAR MARCADOR</h3>
           <span class="p-float-label" v-if="editableMarkerData.html">
-            <InputText id="html" class="w-full" v-model="editableMarkerData.html" @blur="updatePhotoInfo(photoData)" />
+            <InputText id="html" class="w-full" v-model="editableMarkerData.html"
+              @blur="updateMarkerInfo(editableMarkerData)" />
             <label for="html">Texto</label>
           </span>
           <span class="p-float-label">
             <InputText id="tooltip" class="w-full" v-model="editableMarkerData.tooltip"
-              @blur="updatePhotoInfo(photoData)" />
+              @blur="updateMarkerInfo(editableMarkerData)" />
             <label for="tooltip">Tooltip</label>
           </span>
           <span class="p-float-label">
-            <Textarea v-model="editableMarkerData.content" class="w-full" rows="8" @blur="updatePhotoInfo(photoData)" />
+            <Textarea v-model="editableMarkerData.content" class="w-full" rows="8"
+              @blur="updateMarkerInfo(editableMarkerData)" />
             <label>Content</label>
           </span>
           <span class="p-float-label">
