@@ -391,9 +391,8 @@ const resetFields = () => {
 </script>
 
 <template>
-  <div class="mx-2 md:mx-4 lg:mx-6 xl:mx-8 2xl:mx-10 xl:h-[80vh]">
-    <div class="bg-black text-white flex flex-wrap p-2 gap-4">
-      
+  <div class="mx-2 md:mx-4 lg:mx-6 xl:mx-8 2xl:mx-10 xl:h-full my-4">
+    <!-- <div class="bg-black text-white flex flex-wrap p-2 gap-4">
       <div class="border p-4">
         activeTab: {{ activeTab }}
       </div>
@@ -412,8 +411,8 @@ const resetFields = () => {
       <div class="border p-4">
         markerPin: {{ markerPin }}
       </div>
-    </div>
-    <div class="flex flex-col gap-4 2xl:grid grid-cols-3 mt-12 xl:h-full">
+    </div> -->
+    <div class="flex flex-col gap-4 2xl:grid grid-cols-3" style="height: calc(100vh - 7rem);">
 
       <div class="w-full border border-gray-50 shadow-xl h-full relative"
         v-if="addingMarker === false && editingMarker === false">

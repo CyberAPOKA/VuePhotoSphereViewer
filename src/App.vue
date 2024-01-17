@@ -5,8 +5,8 @@ import favIcon from '@/assets/favicon.png'
 </script>
 
 <template>
-  <nav class="bg-white">
-    <div class="flex flex-wrap items-center justify-between mx-auto px-4 py-3 border-b border-gray-300">
+  <nav>
+    <div class="flex flex-wrap items-center justify-between mx-auto px-4 py-3 border-b border-gray-300 md:h-20">
 
       <div class="flex justify-center items-center gap-4">
         <img :src="favIcon" alt="fav icon" class="w-10">
